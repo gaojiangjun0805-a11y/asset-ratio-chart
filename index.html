@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>资产比值K线图</title>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+  :root{
+    --bg:#0e1117; --panel:#161b22; --border:#2a2f3a; --text:#e6e6e6;
+    --muted:#8a919e; --accent:#4f9dff; --up:#26a69a; --down:#ef5350;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  header{
+    padding:16px 20px; border-bottom:1px solid var(--border);
+    display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;
+  }
+  h1{font-size:18px; margin:0 20px 0 0; white-space:nowrap;}
+  .field{display:flex; flex-direction:column; gap:4px;}
+  .field label{font-size:12px; color:var(--muted);}
+  .resolved-row{
+    display:flex; flex-wrap:wrap; gap:6px 24px;
+    padding:8px 20px; font-size:11px; color:var(--muted); line-height:1.3;
+    border-bottom:1px solid var(--border);
+  }
+  .resolved{min-height:14px;}
+  .resolved:empty{display:none;}
+  .resolved.warn{color:#e0a030;}
+  input,select{
+    background:#0b0e13; border:1px solid var(--border); color:var(--text);
+    padding:7px 9px; border-radius:6px; font-size:14px; outline:none;
+  }
+  input:focus,select:focus{border-color:var(--accent);}
+  input[type=text]{width:140px;}
+  .swap-btn{
+    background:#0b0e13; border:1px solid var(--border); color:var(--muted);
+    width:34px; height:34px; border-radius:6px; cursor:pointer; font-size:16px;
+    align-self:center;
+  }
+  .swap-btn:hover{color:var(--text); border-color:var(--accent);}
+  button.primary{
+    background:var(--accent); border:none; color:#fff; padding:8px 18px;
+    border-radius:6px; font-size:14px; cursor:pointer; font-weight:600;
+  }
+  button.primary:disabled{opacity:.5; cursor:default;}
+  .toggle-btn{
+    background:#0b0e13; border:1px solid var(--border); color:var(--muted);
+    padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;
+  }
+  .toggle-btn:hover{color:var(--text); border-color:var(--accent);}
+  .toggle-btn.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .presets{display:flex; flex-direction:column; gap:4px;}
+  .presets .row{display:flex; gap:6px; flex-wrap:wrap;}
+  .preset-btn{
+    background:#0b0e13; border:1px solid var(--border); color:var(--muted);
+    padding:4px 10px; border-radius:14px; font-size:12px; cursor:pointer;
+  }
+  .preset-btn:hover{color:var(--text); border-color:var(--accent);}
+  #status{padding:10px 20px; font-size:13px; color:var(--muted); min-height:18px;}
+  #status.error{color:var(--down);}
+  #info{padding:0 20px 12px; font-size:14px;}
+  #info .big{font-size:20px; font-weight:700; color:var(--accent);}
+  #chart{width:100%; height:520px;}
+  footer{padding:10px 20px; font-size:12px; color:var(--muted); border-top:1px solid var(--border);}
+  datalist{}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>比值K线图</h1>
+
+  <div class="field">
+    <label>标的 A(分子)</label>
+    <input type="text" id="symA" list="symlist" value="BTC">
+  </div>
+
+  <button class="swap-btn" id="swapBtn" title="交换 A / B">⇄</button>
+
+  <div class="field">
+    <label>标的 B(分母)</label>
+    <input type="text" id="symB" list="symlist" value="GOLD">
+  </div>
+
+  <datalist id="symlist">
+    <option value="USD">美元(看原始美元价格)</option>
+    <option value="BTC">比特币</option>
+    <option value="ETH">以太坊</option>
+    <option value="SOL">Solana</option>
+    <option value="DOGE">狗狗币</option>
+    <option value="XRP">瑞波币</option>
+    <option value="BNB">币安币</option>
+    <option value="ADA">艾达币</option>
+    <option value="LTC">莱特币</option>
+    <option value="DOT">波卡</option>
+    <option value="AVAX">雪崩币</option>
+    <option value="LINK">Chainlink</option>
+    <option value="TRX">波场</option>
+    <option value="SHIB">柴犬币</option>
+
+    <option value="AAPL">苹果</option>
+    <option value="MSFT">微软</option>
+    <option value="GOOGL">谷歌</option>
+    <option value="AMZN">亚马逊</option>
+    <option value="NVDA">英伟达</option>
+    <option value="META">Meta</option>
+    <option value="TSLA">特斯拉</option>
+    <option value="NFLX">奈飞</option>
+    <option value="AMD">AMD</option>
+
+    <option value="QQQ">纳指100 ETF</option>
+    <option value="TQQQ">纳指100三倍多 ETF</option>
+    <option value="SQQQ">纳指100三倍空 ETF</option>
+    <option value="SPY">标普500 ETF</option>
+    <option value="DIA">道指 ETF</option>
+
+    <option value="GOLD">黄金</option>
+    <option value="SILVER">白银</option>
+    <option value="OIL">原油</option>
+
+    <option value="SPX">标普500指数</option>
+    <option value="NASDAQ">纳斯达克综合指数</option>
+    <option value="NDX">纳指100指数</option>
+    <option value="DOW">道琼斯指数</option>
+    <option value="VIX">恐慌指数</option>
+    <option value="SSE">上证指数</option>
+    <option value="SZSE">深证成指</option>
+    <option value="HSI">恒生指数</option>
+    <option value="KOSPI">韩国综合指数</option>
+    <option value="NIKKEI">日经225指数</option>
+
+    <option value="腾讯">腾讯(港股)</option>
+    <option value="阿里巴巴">阿里巴巴(美股ADR)</option>
+    <option value="美团">美团(港股)</option>
+    <option value="小米">小米(港股)</option>
+    <option value="比亚迪">比亚迪(港股)</option>
+    <option value="贵州茅台">贵州茅台(A股)</option>
+    <option value="宁德时代">宁德时代(A股)</option>
+    <option value="中国平安">中国平安(A股)</option>
+    <option value="招商银行">招商银行(A股)</option>
+    <option value="五粮液">五粮液(A股)</option>
+    <option value="京东">京东(美股ADR)</option>
+    <option value="拼多多">拼多多(美股ADR)</option>
+    <option value="百度">百度(美股ADR)</option>
+    <option value="网易">网易(美股ADR)</option>
+    <option value="蔚来">蔚来(美股ADR)</option>
+  </datalist>
+
+  <div class="field">
+    <label>时间跨度</label>
+    <select id="range">
+      <option value="1mo">1个月</option>
+      <option value="3mo">3个月</option>
+      <option value="6mo">6个月</option>
+      <option value="1y" selected>1年</option>
+      <option value="2y">2年</option>
+      <option value="5y">5年</option>
+      <option value="10y">10年</option>
+      <option value="max">最长</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label>K线周期</label>
+    <select id="interval">
+      <option value="1d" selected>日线</option>
+      <option value="1wk">周线</option>
+      <option value="1mo">月线</option>
+    </select>
+  </div>
+
+  <button class="primary" id="plotBtn">画图</button>
+  <button class="toggle-btn" id="lockZoomBtn" title="开启后左右拖动只平移,K线宽度/缩放不会变">🔓 锁定K线宽度</button>
+  <button class="toggle-btn" id="liveBtn" title="每 12 秒自动重新拉取最新数据,当前这根K线会跟着实时价格变动">⚪ 开启实时更新</button>
+
+  <div class="presets">
+    <label style="font-size:12px;color:var(--muted);">快速选择</label>
+    <div class="row">
+      <span class="preset-btn" data-a="BTC" data-b="GOLD">比特币/黄金</span>
+      <span class="preset-btn" data-a="TSLA" data-b="BTC">特斯拉/比特币</span>
+      <span class="preset-btn" data-a="TQQQ" data-b="QQQ">TQQQ/QQQ</span>
+      <span class="preset-btn" data-a="TQQQ" data-b="ETH">TQQQ/以太坊</span>
+      <span class="preset-btn" data-a="ETH" data-b="BTC">以太坊/比特币</span>
+      <span class="preset-btn" data-a="HSI" data-b="SSE">恒生/上证</span>
+      <span class="preset-btn" data-a="KOSPI" data-b="NIKKEI">韩国/日经</span>
+    </div>
+  </div>
+</header>
+
+<div class="resolved-row">
+  <span class="resolved" id="resA"></span>
+  <span class="resolved" id="resB"></span>
+</div>
+
+<div id="fileWarning" style="display:none; padding:10px 20px; background:#3a2a12; color:#e0a030; font-size:13px;">
+  ⚠️ 你现在是用 file:// 直接打开这个文件的。免费数据代理最近会拦截这种来源的请求(容易表现为"所有数据源都请求失败了"),
+  建议改用本地服务器方式打开:终端里 <code>cd</code> 到这个文件夹后运行 <code>python3 -m http.server 8090</code>,
+  然后访问 <code>http://localhost:8090/index.html</code>。
+</div>
+
+<div id="status"></div>
+<div id="info"></div>
+<div id="chart"></div>
+
+<footer>
+  数据来源:雅虎财经公开行情接口。比值K线的开/高/低/收分别由 A、B 对应位置的开/高/低/收相除得到,
+  属于常见的"价差/比值图"近似算法,不代表比值本身逐笔盘中的真实最高最低点。任意输入雅虎财经代码即可比较,
+  例如股票(TSLA)、ETF(QQQ、TQQQ)、加密货币(BTC-USD、ETH-USD)、商品期货(GC=F 黄金、SI=F 白银、CL=F 原油)、
+  外汇现货(XAUUSD=X)等。常见加密货币、黄金/白银/原油、主要指数(含中国、韩国、日本)可以直接打简称,
+  例如 <b>BTC</b>、<b>ETH</b>、<b>GOLD</b>、<b>SSE</b>(上证)、<b>HSI</b>(恒生)、<b>KOSPI</b>(韩国),程序会自动换成正确的雅虎代码,输入框下方会显示"解析为:..."方便核对。
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const statusEl = $('status');
+const infoEl = $('info');
+let chart, series;
+
+if(location.protocol === 'file:'){
+  $('fileWarning').style.display = 'block';
+}
+
+function setStatus(msg, isError){
+  statusEl.textContent = msg || '';
+  statusEl.className = isError ? 'error' : '';
+}
+
+const CORS_PROXIES = [
+  (u) => u, // 先尝试直连
+  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+];
+
+// 常用简称 → 雅虎财经真实代码。打 "BTC" 就够了,不用记 "-USD" 这种后缀,
+// 也避免了简称直接查询时撞上无关股票/ETF代码的问题(比如 "ETH" 本来会查到一只无关的基金)。
+const SYMBOL_ALIASES = {
+  // 加密货币
+  BTC:'BTC-USD', ETH:'ETH-USD', SOL:'SOL-USD', DOGE:'DOGE-USD', XRP:'XRP-USD',
+  BNB:'BNB-USD', ADA:'ADA-USD', LTC:'LTC-USD', DOT:'DOT-USD', AVAX:'AVAX-USD',
+  LINK:'LINK-USD', TRX:'TRX-USD', SHIB:'SHIB-USD', USDT:'USDT-USD', USDC:'USDC-USD',
+  // 大宗商品
+  GOLD:'GC=F', SILVER:'SI=F', OIL:'CL=F', COPPER:'HG=F',
+  // 指数
+  SPX:'^GSPC', NASDAQ:'^IXIC', NDX:'^NDX', DOW:'^DJI', VIX:'^VIX',
+  SSE:'000001.SS', SZSE:'399001.SZ', HSI:'^HSI', KOSPI:'^KS11', NIKKEI:'^N225',
+};
+
+// 中文公司名 → 雅虎财经代码。雅虎的搜索接口对中文关键词直接返回"Invalid Search Query"
+// (测过"腾讯""贵州茅台"等一律 400,纯英文如 "tencent" 能查),没法做通用模糊搜索,
+// 所以用一份手工整理的对照表覆盖常问的美股、A股(.SS上海/.SZ深圳)、港股(.HK)公司。
+const CHINESE_NAME_ALIASES = {
+  // 美股科技
+  '苹果':'AAPL', '微软':'MSFT', '谷歌':'GOOGL', '字母表':'GOOGL', '亚马逊':'AMZN',
+  '英伟达':'NVDA', '脸书':'META', 'Meta':'META', '特斯拉':'TSLA', '奈飞':'NFLX',
+  '网飞':'NFLX', '甲骨文':'ORCL', '高通':'QCOM', '博通':'AVGO', '台积电':'TSM',
+  '超微半导体':'AMD',
+  // 美股其他知名公司
+  '沃尔玛':'WMT', '摩根大通':'JPM', '可口可乐':'KO', '迪士尼':'DIS', '星巴克':'SBUX',
+  '麦当劳':'MCD', '耐克':'NKE', '强生':'JNJ', '辉瑞':'PFE', '花旗':'C', '高盛':'GS',
+  '波音':'BA', '好市多':'COST', '优步':'UBER', '万事达':'MA', 'Visa':'V', '维萨':'V',
+  // 中概股(美股ADR)
+  '阿里巴巴':'BABA', '京东':'JD', '拼多多':'PDD', '百度':'BIDU', '网易':'NTES',
+  '蔚来':'NIO', '小鹏':'XPEV', '理想汽车':'LI', '哔哩哔哩':'BILI', '携程':'TCOM',
+  '腾讯音乐':'TME', '爱奇艺':'IQ',
+  // 港股
+  '腾讯':'0700.HK', '腾讯控股':'0700.HK', '美团':'3690.HK', '小米':'1810.HK',
+  '比亚迪':'1211.HK', '建设银行':'0939.HK', '汇丰':'0005.HK', '汇丰控股':'0005.HK',
+  '中国移动':'0941.HK', '友邦保险':'1299.HK',
+  // A股(沪深)
+  '贵州茅台':'600519.SS', '茅台':'600519.SS', '宁德时代':'300750.SZ',
+  '中国平安':'601318.SS', '招商银行':'600036.SS', '五粮液':'000858.SZ',
+  '美的集团':'000333.SZ', '工商银行':'601398.SS', '中国银行':'601988.SS',
+  '中国石油':'601857.SS', '隆基绿能':'601012.SS', '长江电力':'600900.SS',
+  '格力电器':'000651.SZ', '海康威视':'002415.SZ', '比亚迪A股':'002594.SZ',
+  '中信证券':'600030.SS', '恒瑞医药':'600276.SS',
+};
+
+function resolveSymbol(raw){
+  const trimmed = raw.trim();
+  if(CHINESE_NAME_ALIASES[trimmed]) return CHINESE_NAME_ALIASES[trimmed];
+  return SYMBOL_ALIASES[trimmed.toUpperCase()] || trimmed;
+}
+
+// 免费 CORS 代理偶尔会卡住不响应(既不报错也不返回),普通 fetch 没有超时,会导致
+// 页面一直停在"正在加载"。这里给每次尝试加个 8 秒超时,卡住就换下一个数据源。
+function fetchWithTimeout(url, ms){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return fetch(url, {signal: controller.signal}).finally(() => clearTimeout(timer));
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+async function fetchYahoo(symbol, range, interval){
+  const resolved = resolveSymbol(symbol);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolved)}?range=${range}&interval=${interval}`;
+  let json, lastErr;
+  // 免费代理各自会独立、短暂地抽风,一轮都失败不代表真的挂了,间隔一下整轮重试一次
+  // 往往就能绕过去,比只试一遍就报错靠谱很多。
+  for(let round = 0; round < 2 && !json; round++){
+    if(round > 0) await sleep(1200);
+    for(const wrap of CORS_PROXIES){
+      try{
+        const res = await fetchWithTimeout(wrap(url), 8000);
+        // 雅虎对无效代码常常也会返回带 JSON 错误体的 404,先尝试解析,能解析到明确的错误说明就不用再重试其它代理了
+        let body;
+        try{ body = await res.json(); }catch(_){ throw new Error('http '+res.status); }
+        if(body.chart && body.chart.error){
+          throw Object.assign(new Error(`${symbol}: ${body.chart.error.description || '找不到这个代码'}`), {isSymbolError:true});
+        }
+        if(!res.ok) throw new Error('http '+res.status);
+        json = body;
+        break;
+      }catch(e){
+        lastErr = e.name === 'AbortError' ? new Error('请求超时') : e;
+        if(e.isSymbolError) throw e;
+      }
+    }
+  }
+  if(!json) throw new Error(`${symbol}: 所有数据源都请求失败了,重试了两轮(${lastErr && lastErr.message})`);
+
+  const result = json.chart.result && json.chart.result[0];
+  if(!result) throw new Error(`${symbol}: 查不到这个代码`);
+
+  const ts = result.timestamp || [];
+  const q = result.indicators.quote[0];
+  const out = [];
+  for(let i=0;i<ts.length;i++){
+    const o=q.open[i], h=q.high[i], l=q.low[i], c=q.close[i];
+    if(o==null||h==null||l==null||c==null) continue;
+    const dateStr = new Date(ts[i]*1000).toISOString().slice(0,10);
+    out.push({time: dateStr, open:o, high:h, low:l, close:c});
+  }
+  if(out.length === 0) throw new Error(`${symbol}: 没有可用的K线数据`);
+  return { data: out, meta: result.meta || {} };
+}
+
+// 这些简写在雅虎财经里常常会撞上完全无关的股票/ETF代码(例如直接查 "ETH" 会查到一只叫
+// Grayscale Ethereum Mini Trust ETF 的基金),不是报错,所以要主动提醒。只对没有命中
+// SYMBOL_ALIASES、被原样发去查询的输入做这个检查——命中别名表的属于预期解析,不用警告。
+const AMBIGUOUS_SHORTHAND = new Set(['BTC','ETH','USD','EUR','GBP','JPY','DOGE','SOL','XRP','LTC','BNB','ADA','USDT','USDC','TRX','DOT','MATIC','AVAX','LINK','GOLD','SILVER','OIL']);
+
+function describeMeta(symbol, meta){
+  const name = meta.longName || meta.shortName || meta.symbol || symbol;
+  const type = meta.instrumentType || '';
+  const currency = meta.currency || '';
+  const text = `解析为:${name}${type ? '('+type+')' : ''}${currency ? '  '+currency : ''}`;
+  const key = symbol.trim().toUpperCase();
+  const wasAliased = key in SYMBOL_ALIASES;
+  const looksMismatched = !wasAliased && AMBIGUOUS_SHORTHAND.has(key) && type && type !== 'CRYPTOCURRENCY' && type !== 'CURRENCY';
+  return { text, warn: looksMismatched };
+}
+
+function divideSeries(a, b){
+  const mapB = new Map(b.map(d => [d.time, d]));
+  const out = [];
+  for(const da of a){
+    const db = mapB.get(da.time);
+    if(!db) continue;
+    if(db.open===0||db.high===0||db.low===0||db.close===0) continue;
+    const o = da.open/db.open, h = da.high/db.high, l = da.low/db.low, c = da.close/db.close;
+    const vals = [o,h,l,c];
+    out.push({
+      time: da.time,
+      open:o, close:c,
+      high: Math.max(...vals),
+      low: Math.min(...vals),
+    });
+  }
+  return out;
+}
+
+const isUSD = (s) => s.trim().toUpperCase() === 'USD';
+const USD_META = { symbol:'USD', longName:'美元现金(基准货币,恒为 1)', shortName:'USD', instrumentType:'CURRENCY', currency:'USD' };
+
+// 雅虎财经真的有个股票代码叫 "USD"(和美元本身无关),所以不能把它当普通代码去查。
+// 选 USD 时直接用"另一边"的真实日期生成一条全部等于 1 的序列,相除后就等于显示对方资产本身的美元原始价格。
+function usdSeriesFrom(otherData){
+  return otherData.map(d => ({time:d.time, open:1, high:1, low:1, close:1}));
+}
+
+let lockZoom = false;
+
+// 左右拖动时 K 线宽度会变,是因为默认拖到坐标轴上会触发缩放(handleScale),滚轮/双指也会缩放。
+// 锁定后只保留平移(handleScroll.pressedMouseMove),把所有会改变缩放比例的交互都关掉。
+function applyZoomLock(){
+  if(!chart) return;
+  chart.applyOptions({
+    handleScale: {
+      axisPressedMouseMove: !lockZoom,
+      mouseWheel: !lockZoom,
+      pinch: !lockZoom,
+    },
+    handleScroll: {
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+      vertTouchDrag: !lockZoom,
+      mouseWheel: true,
+    },
+  });
+}
+
+function ensureChart(){
+  if(chart) return;
+  chart = LightweightCharts.createChart($('chart'), {
+    layout:{ background:{color:'#0e1117'}, textColor:'#c9d1d9' },
+    grid:{ vertLines:{color:'#1c2129'}, horzLines:{color:'#1c2129'} },
+    rightPriceScale:{ borderColor:'#2a2f3a' },
+    timeScale:{ borderColor:'#2a2f3a' },
+    crosshair:{ mode: LightweightCharts.CrosshairMode.Normal },
+  });
+  series = chart.addCandlestickSeries({
+    upColor:'#26a69a', downColor:'#ef5350',
+    borderUpColor:'#26a69a', borderDownColor:'#ef5350',
+    wickUpColor:'#26a69a', wickDownColor:'#ef5350',
+  });
+  new ResizeObserver(entries=>{
+    const {width} = entries[0].contentRect;
+    chart.applyOptions({width});
+  }).observe($('chart'));
+  applyZoomLock();
+}
+
+let isLoading = false;
+
+// fit=true(手动点"画图"/切换标的等)会重置缩放到全部数据;fit=false(实时刷新的定时 tick)
+// 只刷新数据不动缩放,不然每隔几秒图就被强制归位一次,没法自己拖动看细节。
+async function loadAndRender(fit){
+  const symA = $('symA').value.trim();
+  const symB = $('symB').value.trim();
+  const range = $('range').value;
+  const interval = $('interval').value;
+  if(!symA || !symB){ if(fit) setStatus('请输入两个标的代码', true); return; }
+  if(isLoading) return;
+  isLoading = true;
+
+  if(fit){
+    $('plotBtn').disabled = true;
+    setStatus(`正在加载 ${symA} 与 ${symB} 的数据...`);
+    infoEl.textContent = '';
+    $('resA').textContent = ''; $('resA').className = 'resolved';
+    $('resB').textContent = ''; $('resB').className = 'resolved';
+  }
+
+  if(isUSD(symA) && isUSD(symB)){
+    setStatus('两边都选 USD 没有意义,至少一边要填真实资产', true);
+    isLoading = false; $('plotBtn').disabled = false; return;
+  }
+
+  try{
+    let resultA, resultB;
+    if(isUSD(symB)){
+      resultA = await fetchYahoo(symA, range, interval);
+      resultB = { data: usdSeriesFrom(resultA.data), meta: USD_META };
+    }else if(isUSD(symA)){
+      resultB = await fetchYahoo(symB, range, interval);
+      resultA = { data: usdSeriesFrom(resultB.data), meta: USD_META };
+    }else{
+      [resultA, resultB] = await Promise.all([
+        fetchYahoo(symA, range, interval),
+        fetchYahoo(symB, range, interval),
+      ]);
+    }
+
+    const descA = describeMeta(symA, resultA.meta);
+    const descB = describeMeta(symB, resultB.meta);
+    $('resA').textContent = descA.text; $('resA').className = 'resolved' + (descA.warn ? ' warn' : '');
+    $('resB').textContent = descB.text; $('resB').className = 'resolved' + (descB.warn ? ' warn' : '');
+
+    const ratio = divideSeries(resultA.data, resultB.data);
+    if(ratio.length === 0){
+      setStatus(`${symA} 和 ${symB} 没有共同的交易日,无法对齐计算比值`, true);
+      return;
+    }
+    ensureChart();
+    series.setData(ratio);
+    if(fit) chart.timeScale().fitContent();
+
+    const last = ratio[ratio.length-1];
+    const now = new Date().toLocaleTimeString('zh-CN', {hour12:false});
+    infoEl.innerHTML = `1 ${symA} = <span class="big">${last.close.toPrecision(6)}</span> ${symB}`
+      + `　(${last.time},共 ${ratio.length} 根K线)`
+      + (liveMode ? `　<span style="color:var(--muted)">最后更新 ${now}</span>` : '');
+
+    if(descA.warn || descB.warn){
+      setStatus('⚠️ 上面标了黄色的代码解析到了一个可能不是你想要的股票/ETF,请检查输入框下方的解析结果', true);
+    }else{
+      setStatus('');
+    }
+  }catch(err){
+    console.error(err);
+    setStatus('加载失败: ' + err.message, true);
+  }finally{
+    isLoading = false;
+    $('plotBtn').disabled = false;
+  }
+}
+
+async function plot(){ await loadAndRender(true); }
+
+let liveMode = false;
+let liveTimer = null;
+const LIVE_POLL_MS = 12000;
+
+function stopLive(){
+  if(liveTimer){ clearInterval(liveTimer); liveTimer = null; }
+}
+
+$('liveBtn').addEventListener('click', () => {
+  liveMode = !liveMode;
+  $('liveBtn').classList.toggle('active', liveMode);
+  $('liveBtn').textContent = liveMode ? '🔴 实时更新中(点击关闭)' : '⚪ 开启实时更新';
+  stopLive();
+  if(liveMode){
+    liveTimer = setInterval(() => { loadAndRender(false); }, LIVE_POLL_MS);
+  }
+});
+
+$('plotBtn').addEventListener('click', plot);
+$('lockZoomBtn').addEventListener('click', () => {
+  lockZoom = !lockZoom;
+  $('lockZoomBtn').classList.toggle('active', lockZoom);
+  $('lockZoomBtn').textContent = lockZoom ? '🔒 已锁定K线宽度' : '🔓 锁定K线宽度';
+  applyZoomLock();
+});
+$('swapBtn').addEventListener('click', () => {
+  const a = $('symA').value;
+  $('symA').value = $('symB').value;
+  $('symB').value = a;
+  plot();
+});
+document.querySelectorAll('.preset-btn').forEach(btn=>{
+  btn.addEventListener('click', () => {
+    $('symA').value = btn.dataset.a;
+    $('symB').value = btn.dataset.b;
+    plot();
+  });
+});
+[$('symA'), $('symB')].forEach(input=>{
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') plot(); });
+});
+
+plot();
+</script>
+</body>
+</html>

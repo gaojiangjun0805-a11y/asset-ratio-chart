@@ -535,6 +535,34 @@ function ensureChart(){
 let currentRange = '1y';
 let currentInterval = '1d';
 
+// 时间跨度和K线周期是两个独立控件,选到"退化组合"会导致图上只有一两根K线
+// (比如"1个月"跨度配"月线"周期,一个月里数学上只有 1 根月K线)。
+// 用这份表规定每种周期至少要配多长的跨度才有意义,两个控件互相看着点。
+const RANGE_ORDER = ['1mo','3mo','6mo','1y','2y','5y','10y','max'];
+const MIN_RANGE_FOR_INTERVAL = { '1d':'1mo', '1wk':'6mo', '1mo':'2y' };
+const rangeIndex = (r) => RANGE_ORDER.indexOf(r);
+
+function setActivePill(containerId, value){
+  $(containerId).querySelectorAll('button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.value === value);
+  });
+}
+
+// changed 是用户刚点的那个控件,用来决定出现冲突时该调整"另一个"控件,
+// 而不是覆盖用户刚做的选择。
+function ensureSensibleCombo(changed){
+  const minRange = MIN_RANGE_FOR_INTERVAL[currentInterval] || '1mo';
+  if(rangeIndex(currentRange) < rangeIndex(minRange)){
+    if(changed === 'interval'){
+      currentRange = minRange;
+      setActivePill('rangeGroup', currentRange);
+    }else{
+      currentInterval = '1d';
+      setActivePill('intervalGroup', currentInterval);
+    }
+  }
+}
+
 function setupSegmented(containerId, onChange){
   const container = $(containerId);
   container.querySelectorAll('button').forEach(btn=>{
@@ -546,8 +574,8 @@ function setupSegmented(containerId, onChange){
     });
   });
 }
-setupSegmented('rangeGroup', v => { currentRange = v; });
-setupSegmented('intervalGroup', v => { currentInterval = v; });
+setupSegmented('rangeGroup', v => { currentRange = v; ensureSensibleCombo('range'); });
+setupSegmented('intervalGroup', v => { currentInterval = v; ensureSensibleCombo('interval'); });
 
 let isLoading = false;
 

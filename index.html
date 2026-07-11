@@ -3,183 +3,231 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>资产比值K线图</title>
+<title>比值K线图 · Ratio Chart</title>
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <style>
   :root{
-    --bg:#0e1117; --panel:#161b22; --border:#2a2f3a; --text:#e6e6e6;
-    --muted:#8a919e; --accent:#4f9dff; --up:#26a69a; --down:#ef5350;
+    --bg:#0a0d10; --bg-elevated:#11151a; --panel:#12161b; --panel-2:#161b21;
+    --border:#1e252c; --border-soft:#171d23;
+    --text:#e7ecef; --text-secondary:#848e9c; --text-dim:#5b6673;
+    --accent:#00d4a0; --accent-soft:rgba(0,212,160,.12); --accent-strong:#00f0b5;
+    --up:#00d492; --down:#f6465d; --up-soft:rgba(0,212,146,.12); --down-soft:rgba(246,70,93,.12);
+    --warn:#f0a020;
+    --radius-sm:6px; --radius:10px; --radius-lg:14px;
   }
   *{box-sizing:border-box;}
+  html,body{height:100%;}
   body{
     margin:0; background:var(--bg); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;
+    font-variant-numeric:tabular-nums;
   }
-  header{
-    padding:16px 20px; border-bottom:1px solid var(--border);
-    display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;
+  ::selection{background:var(--accent-soft); color:var(--accent-strong);}
+
+  .app{max-width:1280px; margin:0 auto; padding:0 24px 40px;}
+
+  /* ---- top bar ---- */
+  .topbar{
+    display:flex; align-items:center; gap:14px;
+    padding:18px 0; border-bottom:1px solid var(--border-soft);
   }
-  h1{font-size:18px; margin:0 20px 0 0; white-space:nowrap;}
-  .field{display:flex; flex-direction:column; gap:4px;}
-  .field label{font-size:12px; color:var(--muted);}
-  .resolved-row{
-    display:flex; flex-wrap:wrap; gap:6px 24px;
-    padding:8px 20px; font-size:11px; color:var(--muted); line-height:1.3;
-    border-bottom:1px solid var(--border);
+  .brand{display:flex; align-items:center; gap:10px; margin-right:8px;}
+  .brand-mark{
+    width:30px; height:30px; border-radius:9px; flex:none;
+    background:linear-gradient(135deg,var(--accent),#0090ff);
+    display:flex; align-items:center; justify-content:center;
+    font-size:15px; font-weight:800; color:#04140f;
   }
-  .resolved{min-height:14px;}
-  .resolved:empty{display:none;}
-  .resolved.warn{color:#e0a030;}
-  input,select{
-    background:#0b0e13; border:1px solid var(--border); color:var(--text);
-    padding:7px 9px; border-radius:6px; font-size:14px; outline:none;
+  .brand-text{display:flex; flex-direction:column; line-height:1.15;}
+  .brand-text .cn{font-size:16px; font-weight:700; letter-spacing:.3px;}
+  .brand-text .en{font-size:10px; color:var(--text-dim); letter-spacing:1.5px; text-transform:uppercase;}
+  .topbar-spacer{flex:1;}
+  .topbar-actions{display:flex; gap:8px;}
+
+  /* ---- pair / ticker card ---- */
+  .ticker-card{
+    margin-top:20px; padding:20px 22px; background:var(--panel);
+    border:1px solid var(--border); border-radius:var(--radius-lg);
+    display:flex; flex-wrap:wrap; gap:24px; align-items:center;
   }
-  input:focus,select:focus{border-color:var(--accent);}
-  input[type=text]{width:140px;}
+  .pair-box{display:flex; align-items:center; gap:8px;}
+  .pair-field{display:flex; flex-direction:column; gap:5px;}
+  .pair-field .cap{font-size:10.5px; color:var(--text-dim); letter-spacing:.5px;}
+  input.pair-input{
+    background:transparent; border:none; border-bottom:2px solid var(--border);
+    color:var(--text); font-size:22px; font-weight:700; padding:2px 2px 6px;
+    width:132px; outline:none; letter-spacing:.3px;
+  }
+  input.pair-input:focus{border-bottom-color:var(--accent);}
+  .pair-sep{font-size:20px; color:var(--text-dim); font-weight:300; padding-top:14px;}
   .swap-btn{
-    background:#0b0e13; border:1px solid var(--border); color:var(--muted);
-    width:34px; height:34px; border-radius:6px; cursor:pointer; font-size:16px;
-    align-self:center;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text-secondary);
+    width:34px; height:34px; border-radius:50%; cursor:pointer; font-size:15px;
+    margin-top:12px; transition:.15s;
   }
-  .swap-btn:hover{color:var(--text); border-color:var(--accent);}
-  button.primary{
-    background:var(--accent); border:none; color:#fff; padding:8px 18px;
-    border-radius:6px; font-size:14px; cursor:pointer; font-weight:600;
+  .swap-btn:hover{color:var(--accent); border-color:var(--accent);}
+
+  .ticker-divider{width:1px; align-self:stretch; background:var(--border-soft);}
+
+  .ticker-price-box{display:flex; flex-direction:column; gap:4px; min-width:220px;}
+  .ticker-price{font-size:30px; font-weight:800; letter-spacing:.2px; transition:color .2s;}
+  .ticker-sub{display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--text-secondary);}
+  .ticker-change{
+    display:inline-flex; align-items:center; gap:3px; font-weight:700;
+    padding:2px 8px; border-radius:999px; font-size:12px;
   }
-  button.primary:disabled{opacity:.5; cursor:default;}
+  .ticker-change.up{color:var(--up); background:var(--up-soft);}
+  .ticker-change.down{color:var(--down); background:var(--down-soft);}
+  .ticker-meta{color:var(--text-dim); font-size:11.5px;}
+
+  .plot-btn{
+    background:var(--accent); border:none; color:#04140f; padding:11px 26px;
+    border-radius:var(--radius); font-size:14px; cursor:pointer; font-weight:700;
+    transition:.15s; margin-left:auto;
+  }
+  .plot-btn:hover{background:var(--accent-strong);}
+  .plot-btn:disabled{opacity:.4; cursor:default;}
+
+  /* ---- resolved tags ---- */
+  .resolved-row{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;}
+  .resolved{
+    font-size:11.5px; color:var(--text-secondary); background:var(--panel-2);
+    border:1px solid var(--border); border-radius:999px; padding:4px 12px;
+  }
+  .resolved:empty{display:none;}
+  .resolved.warn{color:var(--warn); border-color:rgba(240,160,32,.4); background:rgba(240,160,32,.08);}
+
+  /* ---- controls row ---- */
+  .controls-row{
+    margin-top:18px; display:flex; flex-wrap:wrap; align-items:center; gap:14px 22px;
+    padding:12px 4px; border-bottom:1px solid var(--border-soft);
+  }
+  .segmented{display:flex; gap:2px; background:var(--panel-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:3px;}
+  .segmented button{
+    background:transparent; border:none; color:var(--text-secondary); font-size:12.5px;
+    padding:6px 11px; border-radius:5px; cursor:pointer; font-weight:600; transition:.12s;
+  }
+  .segmented button:hover{color:var(--text);}
+  .segmented button.active{background:var(--accent-soft); color:var(--accent-strong);}
+
   .toggle-btn{
-    background:#0b0e13; border:1px solid var(--border); color:var(--muted);
-    padding:8px 14px; border-radius:6px; font-size:13px; cursor:pointer;
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text-secondary);
+    padding:8px 13px; border-radius:var(--radius-sm); font-size:12.5px; cursor:pointer; font-weight:600;
+    transition:.12s;
   }
-  .toggle-btn:hover{color:var(--text); border-color:var(--accent);}
-  .toggle-btn.active{background:var(--accent); border-color:var(--accent); color:#fff;}
-  .presets{display:flex; flex-direction:column; gap:4px;}
-  .presets .row{display:flex; gap:6px; flex-wrap:wrap;}
+  .toggle-btn:hover{color:var(--text); border-color:var(--text-dim);}
+  .toggle-btn.active{background:var(--accent-soft); border-color:var(--accent); color:var(--accent-strong);}
+
+  .presets-row{display:flex; flex-wrap:wrap; gap:8px; margin-left:auto;}
   .preset-btn{
-    background:#0b0e13; border:1px solid var(--border); color:var(--muted);
-    padding:4px 10px; border-radius:14px; font-size:12px; cursor:pointer;
+    background:transparent; border:1px solid var(--border); color:var(--text-secondary);
+    padding:6px 13px; border-radius:999px; font-size:12px; cursor:pointer; transition:.12s;
   }
-  .preset-btn:hover{color:var(--text); border-color:var(--accent);}
-  #status{padding:10px 20px; font-size:13px; color:var(--muted); min-height:18px;}
+  .preset-btn:hover{color:var(--accent-strong); border-color:var(--accent);}
+
+  #status{padding:10px 4px; font-size:13px; color:var(--text-secondary); min-height:16px;}
   #status.error{color:var(--down);}
-  #info{padding:0 20px 12px; font-size:14px;}
-  #info .big{font-size:20px; font-weight:700; color:var(--accent);}
-  #chart{width:100%; height:520px;}
-  footer{padding:10px 20px; font-size:12px; color:var(--muted); border-top:1px solid var(--border);}
+
+  #fileWarning{
+    display:none; margin-top:14px; padding:11px 16px; background:rgba(240,160,32,.08);
+    border:1px solid rgba(240,160,32,.3); color:var(--warn); font-size:12.5px; border-radius:var(--radius);
+    line-height:1.6;
+  }
+  #fileWarning code{background:rgba(255,255,255,.08); padding:1px 5px; border-radius:4px;}
+
+  .chart-card{
+    margin-top:14px; background:var(--panel); border:1px solid var(--border);
+    border-radius:var(--radius-lg); padding:12px 8px 4px; overflow:hidden;
+  }
+  #chart{width:100%; height:540px;}
+
+  footer{padding:20px 4px 4px; font-size:11.5px; color:var(--text-dim); line-height:1.7;}
+  footer b{color:var(--text-secondary);}
+
   datalist{}
+
+  @media (max-width:720px){
+    .ticker-card{flex-direction:column; align-items:flex-start;}
+    .ticker-divider{display:none;}
+    .plot-btn{margin-left:0; width:100%;}
+    .presets-row{margin-left:0;}
+  }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>比值K线图</h1>
+<div class="app">
 
-  <div class="field">
-    <label>标的 A(分子)</label>
-    <input type="text" id="symA" list="symlist" value="BTC">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">⇄</div>
+      <div class="brand-text">
+        <span class="cn">比值K线图</span>
+        <span class="en">Ratio Chart</span>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-actions">
+      <button class="toggle-btn" id="lockZoomBtn" title="开启后左右拖动只平移,K线宽度/缩放不会变">🔓 锁定宽度</button>
+      <button class="toggle-btn" id="liveBtn" title="每 12 秒自动重新拉取最新数据,当前这根K线会跟着实时价格变动">⚪ 实时更新</button>
+    </div>
   </div>
 
-  <button class="swap-btn" id="swapBtn" title="交换 A / B">⇄</button>
+  <div class="ticker-card">
+    <div class="pair-box">
+      <div class="pair-field">
+        <span class="cap">分子 NUMERATOR</span>
+        <input type="text" id="symA" list="symlist" value="BTC" class="pair-input">
+      </div>
+      <span class="pair-sep">/</span>
+      <div class="pair-field">
+        <span class="cap">分母 DENOMINATOR</span>
+        <input type="text" id="symB" list="symlist" value="GOLD" class="pair-input">
+      </div>
+      <button class="swap-btn" id="swapBtn" title="交换 A / B">⇄</button>
+    </div>
 
-  <div class="field">
-    <label>标的 B(分母)</label>
-    <input type="text" id="symB" list="symlist" value="GOLD">
+    <div class="ticker-divider"></div>
+
+    <div class="ticker-price-box">
+      <div class="ticker-price" id="tickerPrice">--</div>
+      <div class="ticker-sub">
+        <span class="ticker-change" id="tickerChange"></span>
+        <span class="ticker-meta" id="tickerMeta"></span>
+      </div>
+    </div>
+
+    <button class="plot-btn" id="plotBtn">画图</button>
   </div>
 
-  <datalist id="symlist">
-    <option value="USD">美元(看原始美元价格)</option>
-    <option value="BTC">比特币</option>
-    <option value="ETH">以太坊</option>
-    <option value="SOL">Solana</option>
-    <option value="DOGE">狗狗币</option>
-    <option value="XRP">瑞波币</option>
-    <option value="BNB">币安币</option>
-    <option value="ADA">艾达币</option>
-    <option value="LTC">莱特币</option>
-    <option value="DOT">波卡</option>
-    <option value="AVAX">雪崩币</option>
-    <option value="LINK">Chainlink</option>
-    <option value="TRX">波场</option>
-    <option value="SHIB">柴犬币</option>
-
-    <option value="AAPL">苹果</option>
-    <option value="MSFT">微软</option>
-    <option value="GOOGL">谷歌</option>
-    <option value="AMZN">亚马逊</option>
-    <option value="NVDA">英伟达</option>
-    <option value="META">Meta</option>
-    <option value="TSLA">特斯拉</option>
-    <option value="NFLX">奈飞</option>
-    <option value="AMD">AMD</option>
-
-    <option value="QQQ">纳指100 ETF</option>
-    <option value="TQQQ">纳指100三倍多 ETF</option>
-    <option value="SQQQ">纳指100三倍空 ETF</option>
-    <option value="SPY">标普500 ETF</option>
-    <option value="DIA">道指 ETF</option>
-
-    <option value="GOLD">黄金</option>
-    <option value="SILVER">白银</option>
-    <option value="OIL">原油</option>
-
-    <option value="SPX">标普500指数</option>
-    <option value="NASDAQ">纳斯达克综合指数</option>
-    <option value="NDX">纳指100指数</option>
-    <option value="DOW">道琼斯指数</option>
-    <option value="VIX">恐慌指数</option>
-    <option value="SSE">上证指数</option>
-    <option value="SZSE">深证成指</option>
-    <option value="HSI">恒生指数</option>
-    <option value="KOSPI">韩国综合指数</option>
-    <option value="NIKKEI">日经225指数</option>
-
-    <option value="腾讯">腾讯(港股)</option>
-    <option value="阿里巴巴">阿里巴巴(美股ADR)</option>
-    <option value="美团">美团(港股)</option>
-    <option value="小米">小米(港股)</option>
-    <option value="比亚迪">比亚迪(港股)</option>
-    <option value="贵州茅台">贵州茅台(A股)</option>
-    <option value="宁德时代">宁德时代(A股)</option>
-    <option value="中国平安">中国平安(A股)</option>
-    <option value="招商银行">招商银行(A股)</option>
-    <option value="五粮液">五粮液(A股)</option>
-    <option value="京东">京东(美股ADR)</option>
-    <option value="拼多多">拼多多(美股ADR)</option>
-    <option value="百度">百度(美股ADR)</option>
-    <option value="网易">网易(美股ADR)</option>
-    <option value="蔚来">蔚来(美股ADR)</option>
-  </datalist>
-
-  <div class="field">
-    <label>时间跨度</label>
-    <select id="range">
-      <option value="1mo">1个月</option>
-      <option value="3mo">3个月</option>
-      <option value="6mo">6个月</option>
-      <option value="1y" selected>1年</option>
-      <option value="2y">2年</option>
-      <option value="5y">5年</option>
-      <option value="10y">10年</option>
-      <option value="max">最长</option>
-    </select>
+  <div class="resolved-row">
+    <span class="resolved" id="resA"></span>
+    <span class="resolved" id="resB"></span>
   </div>
 
-  <div class="field">
-    <label>K线周期</label>
-    <select id="interval">
-      <option value="1d" selected>日线</option>
-      <option value="1wk">周线</option>
-      <option value="1mo">月线</option>
-    </select>
+  <div id="fileWarning">
+    ⚠️ 你现在是用 file:// 直接打开这个文件的。免费数据代理最近会拦截这种来源的请求(容易表现为"所有数据源都请求失败了"),
+    建议改用本地服务器方式打开:终端里 <code>cd</code> 到这个文件夹后运行 <code>python3 -m http.server 8090</code>,
+    然后访问 <code>http://localhost:8090/index.html</code>。
   </div>
 
-  <button class="primary" id="plotBtn">画图</button>
-  <button class="toggle-btn" id="lockZoomBtn" title="开启后左右拖动只平移,K线宽度/缩放不会变">🔓 锁定K线宽度</button>
-  <button class="toggle-btn" id="liveBtn" title="每 12 秒自动重新拉取最新数据,当前这根K线会跟着实时价格变动">⚪ 开启实时更新</button>
-
-  <div class="presets">
-    <label style="font-size:12px;color:var(--muted);">快速选择</label>
-    <div class="row">
+  <div class="controls-row">
+    <div class="segmented" id="rangeGroup">
+      <button data-value="1mo">1M</button>
+      <button data-value="3mo">3M</button>
+      <button data-value="6mo">6M</button>
+      <button data-value="1y" class="active">1Y</button>
+      <button data-value="2y">2Y</button>
+      <button data-value="5y">5Y</button>
+      <button data-value="10y">10Y</button>
+      <button data-value="max">MAX</button>
+    </div>
+    <div class="segmented" id="intervalGroup">
+      <button data-value="1d" class="active">日线</button>
+      <button data-value="1wk">周线</button>
+      <button data-value="1mo">月线</button>
+    </div>
+    <div class="presets-row">
       <span class="preset-btn" data-a="BTC" data-b="GOLD">比特币/黄金</span>
       <span class="preset-btn" data-a="TSLA" data-b="BTC">特斯拉/比特币</span>
       <span class="preset-btn" data-a="TQQQ" data-b="QQQ">TQQQ/QQQ</span>
@@ -189,35 +237,90 @@
       <span class="preset-btn" data-a="KOSPI" data-b="NIKKEI">韩国/日经</span>
     </div>
   </div>
-</header>
 
-<div class="resolved-row">
-  <span class="resolved" id="resA"></span>
-  <span class="resolved" id="resB"></span>
+  <div id="status"></div>
+
+  <div class="chart-card">
+    <div id="chart"></div>
+  </div>
+
+  <footer>
+    数据来源:雅虎财经公开行情接口。比值K线的开/高/低/收分别由 <b>A、B</b> 对应位置的开/高/低/收相除得到,
+    属于常见的"价差/比值图"近似算法,不代表比值本身逐笔盘中的真实最高最低点。任意输入雅虎财经代码即可比较,
+    例如股票(TSLA)、ETF(QQQ、TQQQ)、加密货币(BTC-USD、ETH-USD)、商品期货(GC=F 黄金、SI=F 白银、CL=F 原油)、
+    外汇现货(XAUUSD=X)等。常见加密货币、黄金/白银/原油、主要指数(含中国、韩国、日本)可以直接打简称,
+    例如 <b>BTC</b>、<b>ETH</b>、<b>GOLD</b>、<b>SSE</b>(上证)、<b>HSI</b>(恒生)、<b>KOSPI</b>(韩国),程序会自动换成正确的雅虎代码,输入框下方会显示解析结果方便核对。也支持常见中文公司名,如"腾讯""贵州茅台""苹果"。
+  </footer>
+
 </div>
 
-<div id="fileWarning" style="display:none; padding:10px 20px; background:#3a2a12; color:#e0a030; font-size:13px;">
-  ⚠️ 你现在是用 file:// 直接打开这个文件的。免费数据代理最近会拦截这种来源的请求(容易表现为"所有数据源都请求失败了"),
-  建议改用本地服务器方式打开:终端里 <code>cd</code> 到这个文件夹后运行 <code>python3 -m http.server 8090</code>,
-  然后访问 <code>http://localhost:8090/index.html</code>。
-</div>
+<datalist id="symlist">
+  <option value="USD">美元(看原始美元价格)</option>
+  <option value="BTC">比特币</option>
+  <option value="ETH">以太坊</option>
+  <option value="SOL">Solana</option>
+  <option value="DOGE">狗狗币</option>
+  <option value="XRP">瑞波币</option>
+  <option value="BNB">币安币</option>
+  <option value="ADA">艾达币</option>
+  <option value="LTC">莱特币</option>
+  <option value="DOT">波卡</option>
+  <option value="AVAX">雪崩币</option>
+  <option value="LINK">Chainlink</option>
+  <option value="TRX">波场</option>
+  <option value="SHIB">柴犬币</option>
 
-<div id="status"></div>
-<div id="info"></div>
-<div id="chart"></div>
+  <option value="AAPL">苹果</option>
+  <option value="MSFT">微软</option>
+  <option value="GOOGL">谷歌</option>
+  <option value="AMZN">亚马逊</option>
+  <option value="NVDA">英伟达</option>
+  <option value="META">Meta</option>
+  <option value="TSLA">特斯拉</option>
+  <option value="NFLX">奈飞</option>
+  <option value="AMD">AMD</option>
 
-<footer>
-  数据来源:雅虎财经公开行情接口。比值K线的开/高/低/收分别由 A、B 对应位置的开/高/低/收相除得到,
-  属于常见的"价差/比值图"近似算法,不代表比值本身逐笔盘中的真实最高最低点。任意输入雅虎财经代码即可比较,
-  例如股票(TSLA)、ETF(QQQ、TQQQ)、加密货币(BTC-USD、ETH-USD)、商品期货(GC=F 黄金、SI=F 白银、CL=F 原油)、
-  外汇现货(XAUUSD=X)等。常见加密货币、黄金/白银/原油、主要指数(含中国、韩国、日本)可以直接打简称,
-  例如 <b>BTC</b>、<b>ETH</b>、<b>GOLD</b>、<b>SSE</b>(上证)、<b>HSI</b>(恒生)、<b>KOSPI</b>(韩国),程序会自动换成正确的雅虎代码,输入框下方会显示"解析为:..."方便核对。
-</footer>
+  <option value="QQQ">纳指100 ETF</option>
+  <option value="TQQQ">纳指100三倍多 ETF</option>
+  <option value="SQQQ">纳指100三倍空 ETF</option>
+  <option value="SPY">标普500 ETF</option>
+  <option value="DIA">道指 ETF</option>
+
+  <option value="GOLD">黄金</option>
+  <option value="SILVER">白银</option>
+  <option value="OIL">原油</option>
+
+  <option value="SPX">标普500指数</option>
+  <option value="NASDAQ">纳斯达克综合指数</option>
+  <option value="NDX">纳指100指数</option>
+  <option value="DOW">道琼斯指数</option>
+  <option value="VIX">恐慌指数</option>
+  <option value="SSE">上证指数</option>
+  <option value="SZSE">深证成指</option>
+  <option value="HSI">恒生指数</option>
+  <option value="KOSPI">韩国综合指数</option>
+  <option value="NIKKEI">日经225指数</option>
+
+  <option value="腾讯">腾讯(港股)</option>
+  <option value="阿里巴巴">阿里巴巴(美股ADR)</option>
+  <option value="美团">美团(港股)</option>
+  <option value="小米">小米(港股)</option>
+  <option value="比亚迪">比亚迪(港股)</option>
+  <option value="贵州茅台">贵州茅台(A股)</option>
+  <option value="宁德时代">宁德时代(A股)</option>
+  <option value="中国平安">中国平安(A股)</option>
+  <option value="招商银行">招商银行(A股)</option>
+  <option value="五粮液">五粮液(A股)</option>
+  <option value="京东">京东(美股ADR)</option>
+  <option value="拼多多">拼多多(美股ADR)</option>
+  <option value="百度">百度(美股ADR)</option>
+  <option value="网易">网易(美股ADR)</option>
+  <option value="蔚来">蔚来(美股ADR)</option>
+</datalist>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
-const infoEl = $('info');
 let chart, series;
 
 if(location.protocol === 'file:'){
@@ -407,16 +510,20 @@ function applyZoomLock(){
 function ensureChart(){
   if(chart) return;
   chart = LightweightCharts.createChart($('chart'), {
-    layout:{ background:{color:'#0e1117'}, textColor:'#c9d1d9' },
-    grid:{ vertLines:{color:'#1c2129'}, horzLines:{color:'#1c2129'} },
-    rightPriceScale:{ borderColor:'#2a2f3a' },
-    timeScale:{ borderColor:'#2a2f3a' },
-    crosshair:{ mode: LightweightCharts.CrosshairMode.Normal },
+    layout:{ background:{color:'#12161b'}, textColor:'#848e9c', fontFamily:'-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif' },
+    grid:{ vertLines:{color:'#171d23'}, horzLines:{color:'#171d23'} },
+    rightPriceScale:{ borderColor:'#1e252c' },
+    timeScale:{ borderColor:'#1e252c' },
+    crosshair:{
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine:{color:'#2a323b', labelBackgroundColor:'#1e252c'},
+      horzLine:{color:'#2a323b', labelBackgroundColor:'#1e252c'},
+    },
   });
   series = chart.addCandlestickSeries({
-    upColor:'#26a69a', downColor:'#ef5350',
-    borderUpColor:'#26a69a', borderDownColor:'#ef5350',
-    wickUpColor:'#26a69a', wickDownColor:'#ef5350',
+    upColor:'#00d492', downColor:'#f6465d',
+    borderUpColor:'#00d492', borderDownColor:'#f6465d',
+    wickUpColor:'#00d492', wickDownColor:'#f6465d',
   });
   new ResizeObserver(entries=>{
     const {width} = entries[0].contentRect;
@@ -425,15 +532,32 @@ function ensureChart(){
   applyZoomLock();
 }
 
+let currentRange = '1y';
+let currentInterval = '1d';
+
+function setupSegmented(containerId, onChange){
+  const container = $(containerId);
+  container.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      container.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      onChange(btn.dataset.value);
+      plot();
+    });
+  });
+}
+setupSegmented('rangeGroup', v => { currentRange = v; });
+setupSegmented('intervalGroup', v => { currentInterval = v; });
+
 let isLoading = false;
 
-// fit=true(手动点"画图"/切换标的等)会重置缩放到全部数据;fit=false(实时刷新的定时 tick)
+// fit=true(手动点"画图"/切换标的/切换周期等)会重置缩放到全部数据;fit=false(实时刷新的定时 tick)
 // 只刷新数据不动缩放,不然每隔几秒图就被强制归位一次,没法自己拖动看细节。
 async function loadAndRender(fit){
   const symA = $('symA').value.trim();
   const symB = $('symB').value.trim();
-  const range = $('range').value;
-  const interval = $('interval').value;
+  const range = currentRange;
+  const interval = currentInterval;
   if(!symA || !symB){ if(fit) setStatus('请输入两个标的代码', true); return; }
   if(isLoading) return;
   isLoading = true;
@@ -441,7 +565,7 @@ async function loadAndRender(fit){
   if(fit){
     $('plotBtn').disabled = true;
     setStatus(`正在加载 ${symA} 与 ${symB} 的数据...`);
-    infoEl.textContent = '';
+    $('tickerMeta').textContent = '加载中...';
     $('resA').textContent = ''; $('resA').className = 'resolved';
     $('resB').textContent = ''; $('resB').className = 'resolved';
   }
@@ -481,13 +605,25 @@ async function loadAndRender(fit){
     if(fit) chart.timeScale().fitContent();
 
     const last = ratio[ratio.length-1];
+    const prev = ratio.length > 1 ? ratio[ratio.length-2] : null;
+    const changePct = prev ? (last.close - prev.close) / prev.close * 100 : 0;
+    const isUp = changePct >= 0;
     const now = new Date().toLocaleTimeString('zh-CN', {hour12:false});
-    infoEl.innerHTML = `1 ${symA} = <span class="big">${last.close.toPrecision(6)}</span> ${symB}`
-      + `　(${last.time},共 ${ratio.length} 根K线)`
-      + (liveMode ? `　<span style="color:var(--muted)">最后更新 ${now}</span>` : '');
+
+    $('tickerPrice').textContent = last.close.toPrecision(6);
+    $('tickerPrice').style.color = prev ? (isUp ? 'var(--up)' : 'var(--down)') : 'var(--text)';
+    const changeEl = $('tickerChange');
+    if(prev){
+      changeEl.textContent = `${isUp ? '▲' : '▼'} ${Math.abs(changePct).toFixed(2)}%`;
+      changeEl.className = 'ticker-change ' + (isUp ? 'up' : 'down');
+    }else{
+      changeEl.textContent = ''; changeEl.className = 'ticker-change';
+    }
+    $('tickerMeta').textContent = `1 ${symA} = ${last.close.toPrecision(6)} ${symB} · ${last.time} · 共 ${ratio.length} 根K线`
+      + (liveMode ? ` · 最后更新 ${now}` : '');
 
     if(descA.warn || descB.warn){
-      setStatus('⚠️ 上面标了黄色的代码解析到了一个可能不是你想要的股票/ETF,请检查输入框下方的解析结果', true);
+      setStatus('⚠️ 上面标了黄色的代码解析到了一个可能不是你想要的股票/ETF,请检查下方的解析结果', true);
     }else{
       setStatus('');
     }
@@ -513,7 +649,7 @@ function stopLive(){
 $('liveBtn').addEventListener('click', () => {
   liveMode = !liveMode;
   $('liveBtn').classList.toggle('active', liveMode);
-  $('liveBtn').textContent = liveMode ? '🔴 实时更新中(点击关闭)' : '⚪ 开启实时更新';
+  $('liveBtn').textContent = liveMode ? '🔴 实时更新中' : '⚪ 实时更新';
   stopLive();
   if(liveMode){
     liveTimer = setInterval(() => { loadAndRender(false); }, LIVE_POLL_MS);
@@ -524,7 +660,7 @@ $('plotBtn').addEventListener('click', plot);
 $('lockZoomBtn').addEventListener('click', () => {
   lockZoom = !lockZoom;
   $('lockZoomBtn').classList.toggle('active', lockZoom);
-  $('lockZoomBtn').textContent = lockZoom ? '🔒 已锁定K线宽度' : '🔓 锁定K线宽度';
+  $('lockZoomBtn').textContent = lockZoom ? '🔒 已锁定宽度' : '🔓 锁定宽度';
   applyZoomLock();
 });
 $('swapBtn').addEventListener('click', () => {

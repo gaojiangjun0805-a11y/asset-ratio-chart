@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>比值K线图 · Ratio Chart</title>
-<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<title>盖文K线图</title>
+<script src="./vendor/lightweight-charts.standalone.production.js"></script>
 <style>
   :root{
     --bg:#0a0d10; --bg-elevated:#11151a; --panel:#12161b; --panel-2:#161b21;
@@ -152,6 +152,10 @@
     .plot-btn{margin-left:0; width:100%;}
     .presets-row{margin-left:0;}
   }
+  .data-status{font-size:12px;line-height:1.7;color:#a5a9b1;padding:0 4px 8px;overflow-wrap:anywhere;}
+  :root{--bg:#000;--bg-elevated:#090909;--panel:#080808;--panel-2:#121212;--border:#292929;--border-soft:#1d1d1d;--accent:#6993ff;--accent-soft:rgba(105,147,255,.12);--accent-strong:#89aaff;--up:#26a69a;--down:#ef5350;}
+  .brand-mark{background:#6993ff;}.brand-text .en{display:none;}
+  @media(max-width:720px){.app{padding:0 12px 24px}.ticker-card{gap:14px;padding:14px}input.pair-input{width:108px}.pair-box{gap:5px}.segmented{flex-wrap:wrap}.topbar{gap:8px}.topbar-actions{flex-wrap:wrap}.toggle-btn{padding:7px 9px;font-size:12px}#chart{height:440px}}
 </style>
 </head>
 <body>
@@ -162,14 +166,14 @@
     <div class="brand">
       <div class="brand-mark">⇄</div>
       <div class="brand-text">
-        <span class="cn">比值K线图</span>
+        <span class="cn">盖文K线图</span>
         <span class="en">Ratio Chart</span>
       </div>
     </div>
     <div class="topbar-spacer"></div>
     <div class="topbar-actions">
       <button class="toggle-btn" id="lockZoomBtn" title="开启后左右拖动只平移,K线宽度/缩放不会变">🔓 锁定宽度</button>
-      <button class="toggle-btn" id="liveBtn" title="每 12 秒自动重新拉取最新数据,当前这根K线会跟着实时价格变动">⚪ 实时更新</button>
+      <button class="toggle-btn" id="liveBtn" title="每分钟检查站内行情更新；站内行情计划每小时更新一次，可能延迟">自动检查更新</button>
     </div>
   </div>
 
@@ -206,7 +210,7 @@
   </div>
 
   <div id="fileWarning">
-    ⚠️ 你现在是用 file:// 直接打开这个文件的。免费数据代理最近会拦截这种来源的请求(容易表现为"所有数据源都请求失败了"),
+    ⚠️ 你现在是用 file:// 直接打开这个文件的，浏览器可能禁止读取旁边的行情文件。
     建议改用本地服务器方式打开:终端里 <code>cd</code> 到这个文件夹后运行 <code>python3 -m http.server 8090</code>,
     然后访问 <code>http://localhost:8090/index.html</code>。
   </div>
@@ -238,18 +242,19 @@
     </div>
   </div>
 
-  <div id="status"></div>
+  <div id="status" role="status" aria-live="polite"></div>
+  <div id="dataStatus" class="data-status">站内行情计划每小时更新，实际数据时间会显示在这里。</div>
 
   <div class="chart-card">
     <div id="chart"></div>
   </div>
 
   <footer>
-    数据来源:雅虎财经公开行情接口。比值K线的开/高/低/收分别由 <b>A、B</b> 对应位置的开/高/低/收相除得到,
-    属于常见的"价差/比值图"近似算法,不代表比值本身逐笔盘中的真实最高最低点。任意输入雅虎财经代码即可比较,
-    例如股票(TSLA)、ETF(QQQ、TQQQ)、加密货币(BTC-USD、ETH-USD)、商品期货(GC=F 黄金、SI=F 白银、CL=F 原油)、
-    外汇现货(XAUUSD=X)等。常见加密货币、黄金/白银/原油、主要指数(含中国、韩国、日本)可以直接打简称,
-    例如 <b>BTC</b>、<b>ETH</b>、<b>GOLD</b>、<b>SSE</b>(上证)、<b>HSI</b>(恒生)、<b>KOSPI</b>(韩国),程序会自动换成正确的雅虎代码,输入框下方会显示解析结果方便核对。也支持常见中文公司名,如"腾讯""贵州茅台""苹果"。
+    行情计划每小时自动更新，可能延迟或暂停；页面显示真实取得时间，自动检查不代表交易所实时行情。
+    USD 是固定 1 倍基准，保留资产自身报价币种。资产 / USD 保留源 OHLC，上下影线来自原始报价；
+    两个资产的比值按日线开收盘采样，周月按这些样本聚合，不使用两侧独立高低价拼造影线。
+    站内收录常用股票、加密货币、贵金属和指数；其他美股、A 股、港股尝试腾讯财经。来源没有的记录不补造。
+    <a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a> · <a href="./vendor/NOTICE">版权声明</a>
   </footer>
 
 </div>
@@ -318,397 +323,7 @@
   <option value="蔚来">蔚来(美股ADR)</option>
 </datalist>
 
-<script>
-const $ = (id) => document.getElementById(id);
-const statusEl = $('status');
-let chart, series;
-
-if(location.protocol === 'file:'){
-  $('fileWarning').style.display = 'block';
-}
-
-function setStatus(msg, isError){
-  statusEl.textContent = msg || '';
-  statusEl.className = isError ? 'error' : '';
-}
-
-const CORS_PROXIES = [
-  (u) => u, // 先尝试直连
-  (u) => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
-  (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-];
-
-// 常用简称 → 雅虎财经真实代码。打 "BTC" 就够了,不用记 "-USD" 这种后缀,
-// 也避免了简称直接查询时撞上无关股票/ETF代码的问题(比如 "ETH" 本来会查到一只无关的基金)。
-const SYMBOL_ALIASES = {
-  // 加密货币
-  BTC:'BTC-USD', ETH:'ETH-USD', SOL:'SOL-USD', DOGE:'DOGE-USD', XRP:'XRP-USD',
-  BNB:'BNB-USD', ADA:'ADA-USD', LTC:'LTC-USD', DOT:'DOT-USD', AVAX:'AVAX-USD',
-  LINK:'LINK-USD', TRX:'TRX-USD', SHIB:'SHIB-USD', USDT:'USDT-USD', USDC:'USDC-USD',
-  // 大宗商品
-  GOLD:'GC=F', SILVER:'SI=F', OIL:'CL=F', COPPER:'HG=F',
-  // 指数
-  SPX:'^GSPC', NASDAQ:'^IXIC', NDX:'^NDX', DOW:'^DJI', VIX:'^VIX',
-  SSE:'000001.SS', SZSE:'399001.SZ', HSI:'^HSI', KOSPI:'^KS11', NIKKEI:'^N225',
-};
-
-// 中文公司名 → 雅虎财经代码。雅虎的搜索接口对中文关键词直接返回"Invalid Search Query"
-// (测过"腾讯""贵州茅台"等一律 400,纯英文如 "tencent" 能查),没法做通用模糊搜索,
-// 所以用一份手工整理的对照表覆盖常问的美股、A股(.SS上海/.SZ深圳)、港股(.HK)公司。
-const CHINESE_NAME_ALIASES = {
-  // 美股科技
-  '苹果':'AAPL', '微软':'MSFT', '谷歌':'GOOGL', '字母表':'GOOGL', '亚马逊':'AMZN',
-  '英伟达':'NVDA', '脸书':'META', 'Meta':'META', '特斯拉':'TSLA', '奈飞':'NFLX',
-  '网飞':'NFLX', '甲骨文':'ORCL', '高通':'QCOM', '博通':'AVGO', '台积电':'TSM',
-  '超微半导体':'AMD',
-  // 美股其他知名公司
-  '沃尔玛':'WMT', '摩根大通':'JPM', '可口可乐':'KO', '迪士尼':'DIS', '星巴克':'SBUX',
-  '麦当劳':'MCD', '耐克':'NKE', '强生':'JNJ', '辉瑞':'PFE', '花旗':'C', '高盛':'GS',
-  '波音':'BA', '好市多':'COST', '优步':'UBER', '万事达':'MA', 'Visa':'V', '维萨':'V',
-  // 中概股(美股ADR)
-  '阿里巴巴':'BABA', '京东':'JD', '拼多多':'PDD', '百度':'BIDU', '网易':'NTES',
-  '蔚来':'NIO', '小鹏':'XPEV', '理想汽车':'LI', '哔哩哔哩':'BILI', '携程':'TCOM',
-  '腾讯音乐':'TME', '爱奇艺':'IQ',
-  // 港股
-  '腾讯':'0700.HK', '腾讯控股':'0700.HK', '美团':'3690.HK', '小米':'1810.HK',
-  '比亚迪':'1211.HK', '建设银行':'0939.HK', '汇丰':'0005.HK', '汇丰控股':'0005.HK',
-  '中国移动':'0941.HK', '友邦保险':'1299.HK',
-  // A股(沪深)
-  '贵州茅台':'600519.SS', '茅台':'600519.SS', '宁德时代':'300750.SZ',
-  '中国平安':'601318.SS', '招商银行':'600036.SS', '五粮液':'000858.SZ',
-  '美的集团':'000333.SZ', '工商银行':'601398.SS', '中国银行':'601988.SS',
-  '中国石油':'601857.SS', '隆基绿能':'601012.SS', '长江电力':'600900.SS',
-  '格力电器':'000651.SZ', '海康威视':'002415.SZ', '比亚迪A股':'002594.SZ',
-  '中信证券':'600030.SS', '恒瑞医药':'600276.SS',
-};
-
-function resolveSymbol(raw){
-  const trimmed = raw.trim();
-  if(CHINESE_NAME_ALIASES[trimmed]) return CHINESE_NAME_ALIASES[trimmed];
-  return SYMBOL_ALIASES[trimmed.toUpperCase()] || trimmed;
-}
-
-// 免费 CORS 代理偶尔会卡住不响应(既不报错也不返回),普通 fetch 没有超时,会导致
-// 页面一直停在"正在加载"。这里给每次尝试加个 8 秒超时,卡住就换下一个数据源。
-function fetchWithTimeout(url, ms){
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  return fetch(url, {signal: controller.signal}).finally(() => clearTimeout(timer));
-}
-
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-async function fetchYahoo(symbol, range, interval){
-  const resolved = resolveSymbol(symbol);
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(resolved)}?range=${range}&interval=${interval}`;
-  let json, lastErr;
-  // 免费代理各自会独立、短暂地抽风,一轮都失败不代表真的挂了,间隔一下整轮重试一次
-  // 往往就能绕过去,比只试一遍就报错靠谱很多。
-  for(let round = 0; round < 2 && !json; round++){
-    if(round > 0) await sleep(1200);
-    for(const wrap of CORS_PROXIES){
-      try{
-        const res = await fetchWithTimeout(wrap(url), 8000);
-        // 雅虎对无效代码常常也会返回带 JSON 错误体的 404,先尝试解析,能解析到明确的错误说明就不用再重试其它代理了
-        let body;
-        try{ body = await res.json(); }catch(_){ throw new Error('http '+res.status); }
-        if(body.chart && body.chart.error){
-          throw Object.assign(new Error(`${symbol}: ${body.chart.error.description || '找不到这个代码'}`), {isSymbolError:true});
-        }
-        if(!res.ok) throw new Error('http '+res.status);
-        json = body;
-        break;
-      }catch(e){
-        lastErr = e.name === 'AbortError' ? new Error('请求超时') : e;
-        if(e.isSymbolError) throw e;
-      }
-    }
-  }
-  if(!json) throw new Error(`${symbol}: 所有数据源都请求失败了,重试了两轮(${lastErr && lastErr.message})`);
-
-  const result = json.chart.result && json.chart.result[0];
-  if(!result) throw new Error(`${symbol}: 查不到这个代码`);
-
-  const ts = result.timestamp || [];
-  const q = result.indicators.quote[0];
-  const out = [];
-  for(let i=0;i<ts.length;i++){
-    const o=q.open[i], h=q.high[i], l=q.low[i], c=q.close[i];
-    if(o==null||h==null||l==null||c==null) continue;
-    const dateStr = new Date(ts[i]*1000).toISOString().slice(0,10);
-    out.push({time: dateStr, open:o, high:h, low:l, close:c});
-  }
-  if(out.length === 0) throw new Error(`${symbol}: 没有可用的K线数据`);
-  return { data: out, meta: result.meta || {} };
-}
-
-// 这些简写在雅虎财经里常常会撞上完全无关的股票/ETF代码(例如直接查 "ETH" 会查到一只叫
-// Grayscale Ethereum Mini Trust ETF 的基金),不是报错,所以要主动提醒。只对没有命中
-// SYMBOL_ALIASES、被原样发去查询的输入做这个检查——命中别名表的属于预期解析,不用警告。
-const AMBIGUOUS_SHORTHAND = new Set(['BTC','ETH','USD','EUR','GBP','JPY','DOGE','SOL','XRP','LTC','BNB','ADA','USDT','USDC','TRX','DOT','MATIC','AVAX','LINK','GOLD','SILVER','OIL']);
-
-function describeMeta(symbol, meta){
-  const name = meta.longName || meta.shortName || meta.symbol || symbol;
-  const type = meta.instrumentType || '';
-  const currency = meta.currency || '';
-  const text = `解析为:${name}${type ? '('+type+')' : ''}${currency ? '  '+currency : ''}`;
-  const key = symbol.trim().toUpperCase();
-  const wasAliased = key in SYMBOL_ALIASES;
-  const looksMismatched = !wasAliased && AMBIGUOUS_SHORTHAND.has(key) && type && type !== 'CRYPTOCURRENCY' && type !== 'CURRENCY';
-  return { text, warn: looksMismatched };
-}
-
-function divideSeries(a, b){
-  const mapB = new Map(b.map(d => [d.time, d]));
-  const out = [];
-  for(const da of a){
-    const db = mapB.get(da.time);
-    if(!db) continue;
-    if(db.open===0||db.high===0||db.low===0||db.close===0) continue;
-    const o = da.open/db.open, h = da.high/db.high, l = da.low/db.low, c = da.close/db.close;
-    const vals = [o,h,l,c];
-    out.push({
-      time: da.time,
-      open:o, close:c,
-      high: Math.max(...vals),
-      low: Math.min(...vals),
-    });
-  }
-  return out;
-}
-
-const isUSD = (s) => s.trim().toUpperCase() === 'USD';
-const USD_META = { symbol:'USD', longName:'美元现金(基准货币,恒为 1)', shortName:'USD', instrumentType:'CURRENCY', currency:'USD' };
-
-// 雅虎财经真的有个股票代码叫 "USD"(和美元本身无关),所以不能把它当普通代码去查。
-// 选 USD 时直接用"另一边"的真实日期生成一条全部等于 1 的序列,相除后就等于显示对方资产本身的美元原始价格。
-function usdSeriesFrom(otherData){
-  return otherData.map(d => ({time:d.time, open:1, high:1, low:1, close:1}));
-}
-
-let lockZoom = false;
-
-// 左右拖动时 K 线宽度会变,是因为默认拖到坐标轴上会触发缩放(handleScale),滚轮/双指也会缩放。
-// 锁定后只保留平移(handleScroll.pressedMouseMove),把所有会改变缩放比例的交互都关掉。
-function applyZoomLock(){
-  if(!chart) return;
-  chart.applyOptions({
-    handleScale: {
-      axisPressedMouseMove: !lockZoom,
-      mouseWheel: !lockZoom,
-      pinch: !lockZoom,
-    },
-    handleScroll: {
-      pressedMouseMove: true,
-      horzTouchDrag: true,
-      vertTouchDrag: !lockZoom,
-      mouseWheel: true,
-    },
-  });
-}
-
-function ensureChart(){
-  if(chart) return;
-  chart = LightweightCharts.createChart($('chart'), {
-    layout:{ background:{color:'#12161b'}, textColor:'#848e9c', fontFamily:'-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif' },
-    grid:{ vertLines:{color:'#171d23'}, horzLines:{color:'#171d23'} },
-    rightPriceScale:{ borderColor:'#1e252c' },
-    timeScale:{ borderColor:'#1e252c' },
-    crosshair:{
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine:{color:'#2a323b', labelBackgroundColor:'#1e252c'},
-      horzLine:{color:'#2a323b', labelBackgroundColor:'#1e252c'},
-    },
-  });
-  series = chart.addCandlestickSeries({
-    upColor:'#00d492', downColor:'#f6465d',
-    borderUpColor:'#00d492', borderDownColor:'#f6465d',
-    wickUpColor:'#00d492', wickDownColor:'#f6465d',
-  });
-  new ResizeObserver(entries=>{
-    const {width} = entries[0].contentRect;
-    chart.applyOptions({width});
-  }).observe($('chart'));
-  applyZoomLock();
-}
-
-let currentRange = '1y';
-let currentInterval = '1d';
-
-// 时间跨度和K线周期是两个独立控件,选到"退化组合"会导致图上只有一两根K线
-// (比如"1个月"跨度配"月线"周期,一个月里数学上只有 1 根月K线)。
-// 用这份表规定每种周期至少要配多长的跨度才有意义,两个控件互相看着点。
-const RANGE_ORDER = ['1mo','3mo','6mo','1y','2y','5y','10y','max'];
-const MIN_RANGE_FOR_INTERVAL = { '1d':'1mo', '1wk':'6mo', '1mo':'2y' };
-const rangeIndex = (r) => RANGE_ORDER.indexOf(r);
-
-function setActivePill(containerId, value){
-  $(containerId).querySelectorAll('button').forEach(b=>{
-    b.classList.toggle('active', b.dataset.value === value);
-  });
-}
-
-// changed 是用户刚点的那个控件,用来决定出现冲突时该调整"另一个"控件,
-// 而不是覆盖用户刚做的选择。
-function ensureSensibleCombo(changed){
-  const minRange = MIN_RANGE_FOR_INTERVAL[currentInterval] || '1mo';
-  if(rangeIndex(currentRange) < rangeIndex(minRange)){
-    if(changed === 'interval'){
-      currentRange = minRange;
-      setActivePill('rangeGroup', currentRange);
-    }else{
-      currentInterval = '1d';
-      setActivePill('intervalGroup', currentInterval);
-    }
-  }
-}
-
-function setupSegmented(containerId, onChange){
-  const container = $(containerId);
-  container.querySelectorAll('button').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      container.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      onChange(btn.dataset.value);
-      plot();
-    });
-  });
-}
-setupSegmented('rangeGroup', v => { currentRange = v; ensureSensibleCombo('range'); });
-setupSegmented('intervalGroup', v => { currentInterval = v; ensureSensibleCombo('interval'); });
-
-let isLoading = false;
-
-// fit=true(手动点"画图"/切换标的/切换周期等)会重置缩放到全部数据;fit=false(实时刷新的定时 tick)
-// 只刷新数据不动缩放,不然每隔几秒图就被强制归位一次,没法自己拖动看细节。
-async function loadAndRender(fit){
-  const symA = $('symA').value.trim();
-  const symB = $('symB').value.trim();
-  const range = currentRange;
-  const interval = currentInterval;
-  if(!symA || !symB){ if(fit) setStatus('请输入两个标的代码', true); return; }
-  if(isLoading) return;
-  isLoading = true;
-
-  if(fit){
-    $('plotBtn').disabled = true;
-    setStatus(`正在加载 ${symA} 与 ${symB} 的数据...`);
-    $('tickerMeta').textContent = '加载中...';
-    $('resA').textContent = ''; $('resA').className = 'resolved';
-    $('resB').textContent = ''; $('resB').className = 'resolved';
-  }
-
-  if(isUSD(symA) && isUSD(symB)){
-    setStatus('两边都选 USD 没有意义,至少一边要填真实资产', true);
-    isLoading = false; $('plotBtn').disabled = false; return;
-  }
-
-  try{
-    let resultA, resultB;
-    if(isUSD(symB)){
-      resultA = await fetchYahoo(symA, range, interval);
-      resultB = { data: usdSeriesFrom(resultA.data), meta: USD_META };
-    }else if(isUSD(symA)){
-      resultB = await fetchYahoo(symB, range, interval);
-      resultA = { data: usdSeriesFrom(resultB.data), meta: USD_META };
-    }else{
-      [resultA, resultB] = await Promise.all([
-        fetchYahoo(symA, range, interval),
-        fetchYahoo(symB, range, interval),
-      ]);
-    }
-
-    const descA = describeMeta(symA, resultA.meta);
-    const descB = describeMeta(symB, resultB.meta);
-    $('resA').textContent = descA.text; $('resA').className = 'resolved' + (descA.warn ? ' warn' : '');
-    $('resB').textContent = descB.text; $('resB').className = 'resolved' + (descB.warn ? ' warn' : '');
-
-    const ratio = divideSeries(resultA.data, resultB.data);
-    if(ratio.length === 0){
-      setStatus(`${symA} 和 ${symB} 没有共同的交易日,无法对齐计算比值`, true);
-      return;
-    }
-    ensureChart();
-    series.setData(ratio);
-    if(fit) chart.timeScale().fitContent();
-
-    const last = ratio[ratio.length-1];
-    const prev = ratio.length > 1 ? ratio[ratio.length-2] : null;
-    const changePct = prev ? (last.close - prev.close) / prev.close * 100 : 0;
-    const isUp = changePct >= 0;
-    const now = new Date().toLocaleTimeString('zh-CN', {hour12:false});
-
-    $('tickerPrice').textContent = last.close.toPrecision(6);
-    $('tickerPrice').style.color = prev ? (isUp ? 'var(--up)' : 'var(--down)') : 'var(--text)';
-    const changeEl = $('tickerChange');
-    if(prev){
-      changeEl.textContent = `${isUp ? '▲' : '▼'} ${Math.abs(changePct).toFixed(2)}%`;
-      changeEl.className = 'ticker-change ' + (isUp ? 'up' : 'down');
-    }else{
-      changeEl.textContent = ''; changeEl.className = 'ticker-change';
-    }
-    $('tickerMeta').textContent = `1 ${symA} = ${last.close.toPrecision(6)} ${symB} · ${last.time} · 共 ${ratio.length} 根K线`
-      + (liveMode ? ` · 最后更新 ${now}` : '');
-
-    if(descA.warn || descB.warn){
-      setStatus('⚠️ 上面标了黄色的代码解析到了一个可能不是你想要的股票/ETF,请检查下方的解析结果', true);
-    }else{
-      setStatus('');
-    }
-  }catch(err){
-    console.error(err);
-    setStatus('加载失败: ' + err.message, true);
-  }finally{
-    isLoading = false;
-    $('plotBtn').disabled = false;
-  }
-}
-
-async function plot(){ await loadAndRender(true); }
-
-let liveMode = false;
-let liveTimer = null;
-const LIVE_POLL_MS = 12000;
-
-function stopLive(){
-  if(liveTimer){ clearInterval(liveTimer); liveTimer = null; }
-}
-
-$('liveBtn').addEventListener('click', () => {
-  liveMode = !liveMode;
-  $('liveBtn').classList.toggle('active', liveMode);
-  $('liveBtn').textContent = liveMode ? '🔴 实时更新中' : '⚪ 实时更新';
-  stopLive();
-  if(liveMode){
-    liveTimer = setInterval(() => { loadAndRender(false); }, LIVE_POLL_MS);
-  }
-});
-
-$('plotBtn').addEventListener('click', plot);
-$('lockZoomBtn').addEventListener('click', () => {
-  lockZoom = !lockZoom;
-  $('lockZoomBtn').classList.toggle('active', lockZoom);
-  $('lockZoomBtn').textContent = lockZoom ? '🔒 已锁定宽度' : '🔓 锁定宽度';
-  applyZoomLock();
-});
-$('swapBtn').addEventListener('click', () => {
-  const a = $('symA').value;
-  $('symA').value = $('symB').value;
-  $('symB').value = a;
-  plot();
-});
-document.querySelectorAll('.preset-btn').forEach(btn=>{
-  btn.addEventListener('click', () => {
-    $('symA').value = btn.dataset.a;
-    $('symB').value = btn.dataset.b;
-    plot();
-  });
-});
-[$('symA'), $('symB')].forEach(input=>{
-  input.addEventListener('keydown', e=>{ if(e.key==='Enter') plot(); });
-});
-
-plot();
-</script>
+<script src="./market.js"></script>
+<script src="./app.js"></script>
 </body>
 </html>

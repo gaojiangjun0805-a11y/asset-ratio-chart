@@ -173,7 +173,7 @@
     <div class="topbar-spacer"></div>
     <div class="topbar-actions">
       <button class="toggle-btn" id="lockZoomBtn" title="开启后左右拖动只平移,K线宽度/缩放不会变">🔓 锁定宽度</button>
-      <button class="toggle-btn" id="liveBtn" title="每分钟检查站内行情更新；站内行情计划每小时更新一次，可能延迟">自动检查更新</button>
+      <button class="toggle-btn" id="liveBtn" title="每分钟检查本站是否发布了新版行情；不代表交易所实时行情">自动检查更新</button>
     </div>
   </div>
 
@@ -243,14 +243,14 @@
   </div>
 
   <div id="status" role="status" aria-live="polite"></div>
-  <div id="dataStatus" class="data-status">站内行情计划每小时更新，实际数据时间会显示在这里。</div>
+  <div id="dataStatus" class="data-status">正在读取站内行情，实际数据取得时间会显示在这里。</div>
 
   <div class="chart-card">
     <div id="chart"></div>
   </div>
 
   <footer>
-    行情计划每小时自动更新，可能延迟或暂停；页面显示真实取得时间，自动检查不代表交易所实时行情。
+    行情可能延迟或暂停，请以页面标注的真实取得时间为准；自动检查只检查新版数据，不代表交易所实时行情。
     USD 是固定 1 倍基准，保留资产自身报价币种。资产 / USD 保留源 OHLC，上下影线来自原始报价；
     两个资产的比值按日线开收盘采样，周月按这些样本聚合，不使用两侧独立高低价拼造影线。
     站内收录常用股票、加密货币、贵金属和指数；其他美股、A 股、港股尝试腾讯财经。来源没有的记录不补造。

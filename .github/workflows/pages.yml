@@ -1,0 +1,36 @@
+name: Refresh quotes and publish Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate market transformations
+        run: |
+          node tests/market.cjs
+          python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Fetch real quotes and retain prior successes on failure
+        run: python3 tools/refresh_quotes.py
+      - name: Build only public assets
+        run: python3 tools/build_site.py
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

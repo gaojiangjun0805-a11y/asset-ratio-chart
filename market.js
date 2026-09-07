@@ -70,7 +70,12 @@
     if(!manifest||Date.now()-manifestTime>60000){manifest=await json('./data/manifest.json');manifestTime=Date.now();}
     const entry=manifest.assets?.[symbol];if(!entry)throw Error('站内尚未收录该代码');
     if(!/^[A-Za-z0-9_.-]+\.json$/.test(entry.file))throw Error('行情文件路径无效');
-    return validate(await json('./data/'+entry.file),symbol);
+    const snapshot=validate(await json('./data/'+entry.file),symbol);
+    if(entry.history_from&&entry.history_to){
+      snapshot.coverage_note=`站内历史：${entry.history_from} 至 ${entry.history_to}`;
+      if(manifest.history_limit_note)snapshot.coverage_note+='；'+manifest.history_limit_note;
+    }
+    return snapshot;
    }catch(e){snapshotError=e;}
    try{return await domestic(symbol);}catch(e){throw Error(symbol+'：'+snapshotError.message+'；'+e.message);}
   }

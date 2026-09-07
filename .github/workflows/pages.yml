@@ -29,7 +29,7 @@ jobs:
         run: python3 tools/refresh_quotes.py
       - name: Build only public assets
         run: python3 tools/build_site.py
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: site
       - id: deployment
